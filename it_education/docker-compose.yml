@@ -1,42 +1,40 @@
-version: '3'
+  version: '3'
 
-services:
+  services:
 
-  web:
-    build: .
-    command: >
-      bash -c "./manage.py collectstatic --noinput && ./manage.py makemigrations && ./manage.py migrate && gunicorn -b 0.0.0.0:8000 it_education.wsgi:application"
-    volumes:
-      - .:/app
-      - //home/ubuntu/it_education/it_education/staticfiles:/app/static
-      - /home/ubuntu/it_education/it_education/media:/app/media
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
+    web:
+      build: .
+      command: >
+        bash -c "./manage.py collectstatic --noinput && ./manage.py makemigrations && ./manage.py migrate && gunicorn -b 0.0.0.0:8000 it_education.wsgi:application"
+      volumes:
+        - .:/app
+        - /home/ubuntu/it_final/it_education/staticfiles:/app/static
+        - /home/ubuntu/it_final/it_education/media:/app/media
+      ports:
+        - "8000:8000"
+      depends_on:
+        - db
 
 
-  db:
-    image: postgres:latest
-    restart: always
-    environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    db:
+      image: postgres:latest
+      restart: always
+      environment:
+        POSTGRES_DB: postgres
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
 
-  nginx:
-    build: ./nginx
-    ports:
-      - "80:80"
-    volumes:
-      - //home/ubuntu/it_education/it_education/staticfiles:/app/static
-      - /home/ubuntu/it_education/it_education/media:/app/media
-    depends_on:
-      - web
+    nginx:
+      build: ./nginx
+      ports:
+        - "80:80"
+      volumes:
+        - /home/ubuntu/it_final/it_education/staticfiles:/app/static
+        - /home/ubuntu/it_final/it_education/media:/app/media
+      depends_on:
+        - web
 
-volumes:
-  postgres_data:
-  static_volume:
-  media_volume:
+  volumes:
+    postgres_data:

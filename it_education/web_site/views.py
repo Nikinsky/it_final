@@ -292,20 +292,6 @@ class TariffView(generics.ListAPIView):
     serializer_class = TariffListSerializer
 
 
-class UserTariffListView(generics.ListAPIView):
-    queryset = UserTariff.objects.all()
-    serializer_class = UserTariffSerializer
-
-    def get_queryset(self):
-        return UserTariff.objects.filter(user__id=self.request.user.id)
-
-
-class UserCourseListView(generics.ListAPIView):
-    queryset = UserCourse.objects.all()
-    serializer_class = UserCourseSerializer
-
-    def get_queryset(self):
-        return UserCourse.objects.filter(user__id=self.request.user.id)
 
 
 
@@ -321,25 +307,7 @@ class AboutSchoolListView(generics.ListAPIView):
     serializer_class = AboutSchoolSerializer
 
 
-# class BaseContentViewSet(viewsets.ModelViewSet):
-#     """
-#     Базовый ViewSet для работы с контентом.
-#     Содержит общую логику проверки доступа и обработки запросов.
-#     """
-#
-#     def has_active_tariff(self):
-#         """Проверяет наличие активного тарифа у пользователя"""
-#         return UserTariff.objects.filter(
-#             user=self.request.user,
-#             is_active=True,
-#             end_date__gt=timezone.now()
-#         ).exists()
-#
-#     def get_serializer_context(self):
-#         """Добавляет информацию о доступе в контекст сериализатора"""
-#         context = super().get_serializer_context()
-#         context['has_access'] = self.has_active_tariff()
-#         return context
+
 
 class BaseContentViewSet(viewsets.ModelViewSet):
     """
@@ -348,14 +316,14 @@ class BaseContentViewSet(viewsets.ModelViewSet):
 
     def has_active_tariff(self):
         """Проверяет наличие активного тарифа у пользователя"""
-        # Проверяем сначала авторизацию
         if not self.request.user.is_authenticated:
             return False
 
-        return UserTariff.objects.filter(
+        return Payment.objects.filter(
             user=self.request.user,
             is_active=True,
-            end_date__gt=timezone.now()
+            end_date__gt=timezone.now(),
+            tariff__isnull=False  # Убедимся, что это именно тариф
         ).exists()
 
     def get_serializer_context(self):
@@ -365,15 +333,40 @@ class BaseContentViewSet(viewsets.ModelViewSet):
 
 
 
+
 class StatyaViewSet(BaseContentViewSet):
     """ViewSet для работы со статьями"""
     queryset = Statya.objects.all()
 
     def get_serializer_class(self):
-        """Выбирает подходящий сериализатор в зависимости от наличия подписки"""
+        """Выбирает подходящий сериализатор в зависимости от наличия тарифа"""
         if self.has_active_tariff():
             return StatyaPrivateSerializer
         return StatyaPublicSerializer
+
+    def has_active_tariff(self):
+        """Проверяет наличие активного тарифа у пользователя"""
+        if not self.request.user.is_authenticated:
+            return False
+
+        return Payment.objects.filter(
+            user=self.request.user,
+            is_active=True,
+            end_date__gt=timezone.now(),
+            tariff__isnull=False  # Убедимся, что это именно тариф
+        ).exists()
+
+
+
+# class StatyaViewSet(BaseContentViewSet):
+#     """ViewSet для работы со статьями"""
+#     queryset = Statya.objects.all()
+#
+#     def get_serializer_class(self):
+#         """Выбирает подходящий сериализатор в зависимости от наличия подписки"""
+#         if self.has_active_tariff():
+#             return StatyaPrivateSerializer
+#         return StatyaPublicSerializer
 
 
 class StatyaListView(generics.ListAPIView):
@@ -382,17 +375,36 @@ class StatyaListView(generics.ListAPIView):
 
 
 
-
-
-class MasterClasslView(BaseContentViewSet):
+class MasterClassView(BaseContentViewSet):
+    """ViewSet для работы с мастер-классами"""
     queryset = MasterClass.objects.all()
 
     def get_serializer_class(self):
-        """Выбирает подходящий сериализатор в зависимости от наличия подписки"""
+        """Выбирает подходящий сериализатор в зависимости от наличия тарифа"""
         if self.has_active_tariff():
-            return MasterPrivateSerializer
-        return MasterPublicSerializer
+            return MasterPublicSerializer
+        return MasterPrivateSerializer
 
+    def has_active_tariff(self):
+        """Проверяет наличие активного тарифа у пользователя"""
+        if not self.request.user.is_authenticated:
+            return False
+
+        return Payment.objects.filter(
+            user=self.request.user,
+            is_active=True,
+            end_date__gt=timezone.now(),
+            tariff__isnull=False  # Убедимся, что это именно тариф
+        ).exists()
+
+# class MasterClassView(BaseContentViewSet):
+#     queryset = MasterClass.objects.all()
+#
+#     def get_serializer_class(self):
+#         """Выбирает подходящий сериализатор в зависимости от наличия тарифа"""
+#         if self.has_active_tariff():
+#             return MasterPrivateSerializer
+#         return MasterPublicSerializer
 
 class MasterClassListView(generics.ListAPIView):
     queryset = MasterClass.objects.all()
@@ -424,9 +436,9 @@ class CourseViewSet(BaseContentViewSet):
             return CoursePublicSerializer
 
         try:
-            user_course = UserCourse.objects.get(user=self.request.user, course=self.get_object())
+            user_course = Payment.objects.get(user=self.request.user, course=self.get_object())
             return CoursePrivateSerializer
-        except UserCourse.DoesNotExist:
+        except Payment.DoesNotExist:
             return CoursePublicSerializer
 
     def list(self, request):
@@ -435,7 +447,7 @@ class CourseViewSet(BaseContentViewSet):
 
         # Получаем купленные курсы только для авторизованных пользователей
         if request.user.is_authenticated:
-            purchased = set(UserCourse.objects.filter(
+            purchased = set(Payment.objects.filter(
                 user=request.user
             ).values_list('course_id', flat=True))
 
@@ -461,10 +473,10 @@ class CourseViewSet(BaseContentViewSet):
             return Response({'error': 'Требуется авторизация'}, status=401)
 
         course = self.get_object()
-        if UserCourse.objects.filter(user=request.user, course=course).exists():
+        if Payment.objects.filter(user=request.user, course=course).exists():
             return Response({'error': 'Курс уже куплен'}, status=400)
 
-        UserCourse.objects.create(user=request.user, course=course)
+        Payment.objects.create(user=request.user, course=course)
         return Response({'status': 'success'})
 
 
@@ -492,50 +504,78 @@ class CommentListView(generics.ListAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentUserListSerializer
 
+
+    def get_queryset(self):
+        return Comment.objects.filter(user__id=self.request.user.id)
+
+
 class CommentCreateView(generics.ListCreateAPIView):
     queryset = Comment.objects.all()
     serializer_class = CommentCreateSerializer
 
-class CartItemViewSet(generics.ListCreateAPIView):
-    queryset = CartItem.objects.all()
-    serializer_class = CartItemSerializer
 
-
-class CartViewSet(generics.RetrieveUpdateDestroyAPIView):
-    queryset = Cart.objects.all()
-    serializer_class = CartSerializer
-
-    # def get_queryset(self):
-    #     return Cart.objects.filter(user__id=self.request.user.id)
-
-
-
-class PaymentCreateView(generics.CreateAPIView):
-    queryset = Payment.objects.all()
+class PaymentListCreateView(generics.ListCreateAPIView):
+    """
+    Generic view для создания платежей и получения списка платежей пользователя.
+    Поддерживает создание новых платежей и получение списка с фильтрацией.
+    """
     serializer_class = PaymentSerializer
-
-    def perform_create(self, serializer):
-        # Здесь можно добавить дополнительную логику перед сохранением платежа
-        serializer.save()
-
-class PaymentListView(generics.ListAPIView):
-    queryset = Payment.objects.all()
-    serializer_class = PaymentSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Здесь можно добавить фильтрацию или другую логику
-        return self.queryset.order_by('-created_at')
+        """
+        Возвращает queryset платежей с фильтрацией по параметрам запроса.
+        Поддерживает фильтрацию по типу контента и статусу активности.
+        """
+        queryset = Payment.objects.filter(user=self.request.user)
+
+        # Фильтрация по типу контента
+        content_type = self.request.query_params.get('content_type')
+        if content_type == 'course':
+            queryset = queryset.filter(course__isnull=False)
+        elif content_type == 'tariff':
+            queryset = queryset.filter(tariff__isnull=False)
+
+        # Фильтрация по активности
+        is_active = self.request.query_params.get('active')
+        if is_active == 'true':
+            queryset = queryset.filter(is_active=True)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """
+        Сохраняет текущего пользователя при создании платежа.
+        """
+        serializer.save(user=self.request.user)
 
 
-class PaymentCartCourseView(generics.ListAPIView):
+
+class UserPodpiskoView(generics.ListAPIView):
     queryset = Payment.objects.all()
-    serializer_class = PaymentCourseSerializer
+    serializer_class = UserPodpiskiSerializer
+
+    def get_queryset(self):
+        return Payment.objects.filter(user__id=self.request.user.id)
 
 
-class PaymentCartTariffView(generics.ListAPIView):
+class PaymentHistoryView(generics.ListAPIView):
     queryset = Payment.objects.all()
-    serializer_class = PaymentTariffSerializer
+    serializer_class = PaymentHistorySerializer
 
-class PaymentCartMasterClassView(generics.ListAPIView):
-    queryset = Payment.objects.all()
-    serializer_class = MasterClassPaymentSerializer
+    def get_queryset(self):
+        return Payment.objects.filter(user__id=self.request.user.id)
+
+
+# class PaymentCartCourseView(generics.ListAPIView):
+#     queryset = Payment.objects.all()
+#     serializer_class = PaymentCourseSerializer
+#
+#
+# class PaymentCartTariffView(generics.ListAPIView):
+#     queryset = Payment.objects.all()
+#     serializer_class = PaymentTariffSerializer
+#
+# class PaymentCartMasterClassView(generics.ListAPIView):
+#     queryset = Payment.objects.all()
+#     serializer_class = MasterClassPaymentSerializer

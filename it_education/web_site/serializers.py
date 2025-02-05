@@ -161,27 +161,27 @@ class UserProfileFeedbackSerializer(serializers.ModelSerializer):
 class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['id', 'username', 'fio', 'image', 'phone_number', 'gender_status', 'birthday', 'country', 'city', 'position' ]
+        fields = ['id', 'username', 'email', 'fio', 'image', 'phone_number', 'gender_status', 'birthday', 'country', 'city', 'position' ]
 
 
 class VisaCartCreateSerializer(serializers.ModelSerializer):
     # graduation_date = serializers.DateField(format=('%M-%Y'))
     class Meta:
         model = VisaCart
-        fields = ['user', 'bank_cart', 'number_cart', 'graduation_date', 'csv']
+        fields = ['id', 'user', 'bank_cart', 'number_cart', 'graduation_date', 'csv']
 
 
 class VisaCartSerializer(serializers.ModelSerializer):
-    graduation_date = serializers.DateField(format=('%M-%Y'))
+    graduation_date = serializers.DateField(format=('%m-%Y'))
     class Meta:
         model = VisaCart
-        fields = ['number_cart', 'graduation_date', 'bank_cart']
+        fields = ['id', 'number_cart', 'graduation_date', 'bank_cart']
 
 
 class VisaCartPodpiskiSerializer(serializers.ModelSerializer):
     class Meta:
         model = VisaCart
-        fields = ['number_cart',]
+        fields = ['id', 'number_cart',]
 
 
 class TariffInfoSerializer(serializers.ModelSerializer):
@@ -209,14 +209,6 @@ class TariffForPaySerializer(serializers.ModelSerializer):
         model = Tariff
         fields = ['term_status', 'sum']
 
-
-class UserTariffSerializer(serializers.ModelSerializer):
-    tariff = TariffForCartSerializer()
-    user_tariff_pay = VisaCartPodpiskiSerializer()
-    end_date = serializers.DateField(format=('%D-%M-%Y'))
-    class Meta:
-        model = UserTariff
-        fields = ['tariff', 'user_tariff_pay', 'end_date']
 
 
 
@@ -259,11 +251,6 @@ class AboutSchoolSerializer(serializers.ModelSerializer):
 
 
 
-class PatternSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Pattern
-        fields = ['patterns']
-
 
 
 
@@ -280,7 +267,7 @@ class KeysSerializer(serializers.ModelSerializer):
 class StatyaListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Statya
-        fields = ['id', 'title', 'date', 'image', 'pattern']
+        fields = ['id', 'title', 'date', 'image',]
 
 class StatyaPrivateSerializer(serializers.ModelSerializer):
     keys_statya = KeysSerializer(many=True, read_only=True)
@@ -366,7 +353,7 @@ class MasterPrivateSerializer(serializers.ModelSerializer):
 class MasterClassListSerializer(serializers.ModelSerializer):
     class Meta:
         model = MasterClass
-        fields = ['id', 'title', 'description', 'pattern']
+        fields = ['id', 'title', 'description']
 
 
 class MasterClassPaymentSerializer(serializers.ModelSerializer):
@@ -431,7 +418,7 @@ class CoursePublicSerializer(serializers.ModelSerializer):
         model = Cours
         fields = ['id', 'title', 'description', 'dostup_course', 'count_module', 'count_materials', 'price', 'description1', 'description2', 'description3','who_for_course', 'you_learns',
                  'description4', 'description5', 'modules', 'image_prepod',
-                  'full_name', 'position', 'course_pl', 'questions_course','pattern']
+                  'full_name', 'position', 'course_pl', 'questions_course']
 
 
 class CoursePrivateSerializer(serializers.ModelSerializer):
@@ -446,7 +433,7 @@ class CoursePrivateSerializer(serializers.ModelSerializer):
 class CoursListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cours
-        fields = ['id', 'title', 'description', 'pattern']
+        fields = ['id', 'title', 'description']
 
 class CourseForPaySerializer(serializers.ModelSerializer):
     class Meta:
@@ -457,16 +444,10 @@ class CourseForPaySerializer(serializers.ModelSerializer):
 class CourseListForPaySerializer(serializers.ModelSerializer):
     class Meta:
         model = Cours
-        fields = ['id', 'title', 'description', ]
+        fields = ['id', 'title']
 
 
 
-
-class UserCourseSerializer(serializers.ModelSerializer):
-    user_course = CoursListSerializer(many=True, read_only=True)
-    class Meta:
-        model = UserCourse
-        fields = ['user_course', 'purchase_date']
 
 
 
@@ -493,62 +474,107 @@ class CommentUserListSerializer(serializers.ModelSerializer):
         fields = ['user', 'course', 'text', 'created_date']
 
 
-class CartItemSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CartItem
-        fields = ['course', 'master_class']
 
-class CartSerializer(serializers.ModelSerializer):
-    items = CartItemSerializer(many=True, read_only=True)  # Для отображения связанных CartItem
-
-    class Meta:
-        model = Cart
-        fields = ['id', 'user', 'items']
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    """
+    Сериализатор для обработки платежей и проверки доступа.
+    """
+    content_access = serializers.SerializerMethodField()
 
     class Meta:
         model = Payment
-        fields = ['id', 'course', 'tariff', 'fio', 'email', 'phone','card_number', 'card_expiry',
-                  'card_cvv', 'payment_method','created_at']
+        fields = [
+            'id', 'user', 'course', 'tariff', 'fio', 'phone',
+            'email', 'card_number', 'created_at', 'start_date',
+            'end_date', 'is_active', 'content_access'
+        ]
+        read_only_fields = ['created_at', 'start_date', 'end_date']
 
-    def validate(self, data):
-        # Убедиться, что пользователь оплачивает либо курс, либо тариф, но не оба
-        if 'course' in data and 'tariff' in data:
-            if data['course'] and data['tariff']:
-                raise serializers.ValidationError("Пользователь не может оплачивать одновременно курс и тариф")
-        return data
+    def get_content_access(self, obj):
+        """
+        Возвращает информацию о доступном контенте.
+        """
+        if not obj.is_valid():
+            return {
+                'status': 'expired',
+                'available_content': []
+            }
 
-    def create(self, validated_data):
-        # Создание платежа с привязкой к курсу или тарифу
-        if 'course' in validated_data and validated_data['course']:
-            payment = Payment.objects.create(course=validated_data['course'], **validated_data)
-        elif 'tariff' in validated_data and validated_data['tariff']:
-            payment = Payment.objects.create(tariff=validated_data['tariff'], **validated_data)
-        else:
-            payment = Payment.objects.create(**validated_data)
-        return payment
+        if obj.course:
+            return {
+                'status': 'active',
+                'type': 'course',
+                'available_content': ['Доступ к курсу: ' + obj.course.title]
+            }
+        elif obj.tariff:
+            return {
+                'status': 'active',
+                'type': 'tariff',
+                'available_content': ['Все статьи', 'Все мастер-классы']
+            }
+
+        return {
+            'status': 'invalid',
+            'available_content': []
+        }
+
+
+class UserPodpiskiSerializer(serializers.ModelSerializer):
+    tariff = TariffForCartSerializer(read_only=True)
+    card_number =VisaCartPodpiskiSerializer(read_only=True)
+    end_date = serializers.DateField(format("%d-%m-%Y"))
+    class Meta:
+        model = Payment
+        fields = ['id', 'tariff', 'card_number', 'end_date']
 
 
 
 
-class PaymentCourseSerializer(serializers.ModelSerializer):
+
+
+
+class PaymentHistorySerializer(serializers.ModelSerializer):
+    created_at = serializers.DateTimeField(format("%d-%m-%Y"))
     course = CourseListForPaySerializer(read_only=True)
+    tariff = TariffForPaySerializer(read_only=True)
+
     class Meta:
         model = Payment
-        fields = ['id', 'course']
+        fields = ['id', 'created_at','course','tariff']
 
 
-class PaymentTariffSerializer(serializers.ModelSerializer):
-    tariff = TariffListSerializer(read_only=True)
-    class Meta:
-        model = Payment
-        fields = ['id', 'tariff']
 
 
-class PaymentMasterClassSerializer(serializers.ModelSerializer):
-    master_class = MasterClassPaymentSerializer(read_only=True)
-    class Meta:
-        model = Payment
-        fields = ['id', 'master_class']
+
+
+
+
+
+
+
+
+
+
+
+
+# class PaymentCourseSerializer(serializers.ModelSerializer):
+#     course = CourseListForPaySerializer(read_only=True)
+#     class Meta:
+#         model = Payment
+#         fields = ['id', 'course']
+#
+#
+# class PaymentTariffSerializer(serializers.ModelSerializer):
+#     tariff = TariffListSerializer(read_only=True)
+#     class Meta:
+#         model = Payment
+#         fields = ['id', 'tariff']
+#
+#
+# class PaymentMasterClassSerializer(serializers.ModelSerializer):
+#     master_class = MasterClassPaymentSerializer(read_only=True)
+#     class Meta:
+#         model = Payment
+#         fields = ['id', 'master_class']

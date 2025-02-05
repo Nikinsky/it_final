@@ -369,11 +369,6 @@ class MasterClassPaymentSerializer(serializers.ModelSerializer):
 
 
 
-
-
-
-
-
 class WhoForCoursSerializer(serializers.ModelSerializer):
     class Meta:
         model = WhoForCours
@@ -519,6 +514,8 @@ class PaymentSerializer(serializers.ModelSerializer):
             'status': 'invalid',
             'available_content': []
         }
+
+
 
 
 class UserPodpiskiSerializer(serializers.ModelSerializer):

@@ -15,8 +15,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
-from django.conf.global_settings import EMAIL_HOST_PASSWORD, EMAIL_HOST, EMAIL_PORT, EMAIL_HOST_USER, EMAIL_USE_SSL, \
-    DEFAULT_FROM_EMAIL, SERVER_EMAIL
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -31,7 +30,7 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG")
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS").split(',')
+ALLOWED_HOSTS = ["*"]
 
 
 
@@ -174,10 +173,24 @@ CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    'https://it-platforma.vercel.app',
+    'https://it-platforma.vercel.app'
 ]
 CORS_ALLOW_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 
+# CORS_ALLOW_CREDENTIALS = True
+
+# Добавьте также:
+# CORS_ALLOW_HEADERS = [
+#     'accept',
+#     'accept-encoding',
+#     'authorization',
+#     'content-type',
+#     'dnt',
+#     'origin',
+#     'user-agent',
+#     'x-csrftoken',
+#     'x-requested-with',
+# ]
 
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -202,3 +215,6 @@ SIMPLE_JWT = {
 
 # Дополнительные настройки безопасности
 PASSWORD_RESET_TIMEOUT_DAYS = 1  # Общий тайм-аут для сброса пароля
+
+# CSRF_COOKIE_SECURE = True  # Если сервер работает по HTTPS
+# CSRF_TRUSTED_ORIGINS = ['https://aida-web.dev']  # Добавьте ваш домен

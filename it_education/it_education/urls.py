@@ -34,6 +34,7 @@ schema_view = get_schema_view(
     openapi.Info(
         title="Episyche Technologies",
         default_version='v1',),
+    # url='https://aida-web.dev',  # Добавьте ваш домен
     public=True,
     permission_classes=(permissions.AllowAny,),
 )
